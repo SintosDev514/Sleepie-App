@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Sleepie</string>
+    <string name="sleep_history_title">Sleep History</string>
+    <string name="back_navigation">Navigate back</string>
+</resources>
