@@ -19,4 +19,10 @@ class SleepViewModel(application: Application) : AndroidViewModel(application) {
             sleepSessionDao.insertSleepSession(session)
         }
     }
+
+    fun deleteSleepSession(session: SleepSession) {
+        viewModelScope.launch {
+            sleepSessionDao.deleteSleepSession(session)
+        }
+    }
 }

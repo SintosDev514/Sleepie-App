@@ -1,6 +1,7 @@
 package com.example.sleepie.data.db
 
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
@@ -12,4 +13,7 @@ interface SleepSessionDao {
 
     @Insert
     suspend fun insertSleepSession(session: SleepSession)
+
+    @Delete
+    suspend fun deleteSleepSession(session: SleepSession)
 }

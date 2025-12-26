@@ -1,6 +1,8 @@
 package com.example.sleepie.screens
 
 import android.app.Application
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -8,14 +10,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -31,25 +34,19 @@ import com.example.sleepie.viewModel.SleepViewModelFactory
 @Composable
 fun HistoryScreen(navController: NavController) {
     val application = LocalContext.current.applicationContext as Application
-    val viewModel: SleepViewModel = viewModel(
-        factory = SleepViewModelFactory(application)
-    )
+    val viewModel: SleepViewModel =
+        viewModel(factory = SleepViewModelFactory(application))
 
-    val sleepHistory by viewModel.allSleepSessions.collectAsState(initial = emptyList())
+    val sleepHistory by viewModel.allSleepSessions.collectAsState(emptyList())
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        "Sleep History",
-                        fontWeight = FontWeight.SemiBold
-                    )
-                },
+                title = { Text("Sleep History") },
                 navigationIcon = {
                     Icon(
                         imageVector = Icons.Filled.History,
-                        contentDescription = "History",
+                        contentDescription = null,
                         modifier = Modifier.padding(start = 12.dp)
                     )
                 }
@@ -57,46 +54,58 @@ fun HistoryScreen(navController: NavController) {
         }
     ) { padding ->
 
-        if (sleepHistory.isEmpty()) {
-            // Empty State UI
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Filled.History,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(56.dp)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        "No sleep records yet",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        "Your sleep sessions will appear here",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .padding(padding)
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                items(sleepHistory) { record ->
-                    SleepHistoryCard(record)
-                }
+        LazyColumn(
+            modifier = Modifier
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(sleepHistory, key = { it.id }) { session ->
 
-                item { Spacer(modifier = Modifier.height(12.dp)) }
+                val dismissState = rememberSwipeToDismissBoxState(
+                    confirmValueChange = {
+                        if (it == SwipeToDismissBoxValue.EndToStart) {
+                            viewModel.deleteSleepSession(session)
+                            true
+                        } else false
+                    }
+                )
+
+                SwipeToDismissBox(
+                    state = dismissState,
+                    backgroundContent = {
+                        val color by animateColorAsState(
+                            if (dismissState.targetValue == SwipeToDismissBoxValue.EndToStart)
+                                Color.Red
+                            else Color.Transparent,
+                            label = ""
+                        )
+
+                        val scale by animateFloatAsState(
+                            if (dismissState.targetValue == SwipeToDismissBoxValue.EndToStart)
+                                1.2f else 0.8f,
+                            label = ""
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(color, RoundedCornerShape(16.dp))
+                                .padding(end = 20.dp),
+                            contentAlignment = Alignment.CenterEnd
+                        ) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "Delete",
+                                tint = Color.White,
+                                modifier = Modifier.scale(scale)
+                            )
+                        }
+                    },
+                    content = {
+                        SleepHistoryCard(session)
+                    }
+                )
             }
         }
     }
@@ -104,86 +113,58 @@ fun HistoryScreen(navController: NavController) {
 
 @Composable
 fun SleepHistoryCard(record: SleepSession) {
-
     val qualityColor = when (record.quality) {
         "Excellent" -> Color(0xFF4CAF50)
         "Good" -> Color(0xFFFFC107)
         else -> Color(0xFFF44336)
     }
 
-    val qualityIcon = when (record.quality) {
-        "Excellent", "Good" -> Icons.Filled.CheckCircle
-        else -> Icons.Filled.Warning
-    }
-
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(6.dp),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier
-                .padding(18.dp)
-                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.surface,
+                            MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    )
+                )
+                .padding(20.dp)
         ) {
-
-            // Date
             Text(
                 text = record.date,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
-            Divider(color = MaterialTheme.colorScheme.surfaceVariant)
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(Modifier.height(12.dp))
 
-            // Duration + Quality
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                Text("Sleep: ${record.duration}")
 
-                Column {
-                    Text(
-                        "Sleep Duration",
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (record.quality == "Excellent" || record.quality == "Good")
+                            Icons.Filled.CheckCircle else Icons.Filled.Warning,
+                        contentDescription = null,
+                        tint = qualityColor,
+                        modifier = Modifier.size(20.dp)
                     )
+                    Spacer(Modifier.width(6.dp))
                     Text(
-                        record.duration,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Medium
+                        text = record.quality,
+                        color = qualityColor,
+                        fontWeight = FontWeight.SemiBold
                     )
-                }
-
-                // Quality Chip
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = qualityColor.copy(alpha = 0.12f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(
-                            horizontal = 12.dp,
-                            vertical = 6.dp
-                        ),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = qualityIcon,
-                            contentDescription = record.quality,
-                            tint = qualityColor,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            record.quality,
-                            color = qualityColor,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 14.sp
-                        )
-                    }
                 }
             }
         }
