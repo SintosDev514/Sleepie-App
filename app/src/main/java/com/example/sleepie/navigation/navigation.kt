@@ -20,7 +20,7 @@ fun SleepieNavGraph(navController: NavHostController, modifier: Modifier = Modif
         modifier = modifier
     ) {
         composable(NavigationDestinations.HOME) { HomeScreen(navController) }
-        composable(NavigationDestinations.ALARM) { AlarmScreen() }
+        composable(NavigationDestinations.ALARM) { AlarmScreen(navController) } // This is the fix
         composable(NavigationDestinations.HISTORY) { HistoryScreen(navController) }
 
         composable(

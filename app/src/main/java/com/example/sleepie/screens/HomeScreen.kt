@@ -5,13 +5,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Alarm
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -35,112 +31,109 @@ fun HomeScreen(
 ) {
     val application = LocalContext.current.applicationContext as Application
     val viewModel: SleepViewModel = viewModel(factory = SleepViewModelFactory(application))
-    val lastSleepSession by viewModel.allSleepSessions.collectAsState(initial = null)
+    val lastSleepSession by viewModel.allSleepSessions.collectAsState(initial = emptyList())
 
     Scaffold(
-        topBar = {
-            HomeScreenTopAppBar()
-        },
+        topBar = { HomeTopBar() },
         containerColor = MaterialTheme.colorScheme.background,
         modifier = modifier
-    ) { paddingValues ->
-        HomeScreenContent(
-            navController = navController,
-            lastSleepSession = lastSleepSession?.firstOrNull(),
-            modifier = Modifier.padding(paddingValues)
-        )
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            GreetingSection()
+            SleepSummaryCard(lastSleepSession.firstOrNull())
+            ActionSection(navController)
+        }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HomeScreenTopAppBar() {
+private fun HomeTopBar() {
     TopAppBar(
         title = {
             Text(
-                text = "Sleepie",
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimary
+                "Sleepie",
+                fontWeight = FontWeight.Bold
             )
         },
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-        ),
-        navigationIcon = {
-            Icon(
-                imageVector = Icons.Filled.Home,
-                contentDescription = "Home",
-                tint = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.padding(start = 12.dp)
-            )
-        }
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     )
 }
 
 @Composable
-private fun HomeScreenContent(
-    navController: NavController,
-    lastSleepSession: SleepSession?,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
-    ) {
-        SleepSummaryCard(lastSleepSession)
-        NavigationButtons(navController = navController)
+private fun GreetingSection() {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = "Good Evening 🌙",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = "Track your sleep and wake up refreshed",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
 @Composable
 private fun SleepSummaryCard(lastSleepSession: SleepSession?) {
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.primaryContainer
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(180.dp)
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier
-                .padding(24.dp)
-                .fillMaxSize(),
-            verticalArrangement = Arrangement.SpaceBetween
+            modifier = Modifier.padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = "Last Sleep Session",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.SemiBold
-                ),
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.NightsStay,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Last Sleep",
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
 
             if (lastSleepSession != null) {
                 Text(
                     text = lastSleepSession.duration,
-                    style = MaterialTheme.typography.headlineLarge.copy(
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
 
-                Text(
-                    text = "Sleep Quality: ${lastSleepSession.quality}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                AssistChip(
+                    onClick = {},
+                    label = { Text("Quality: ${lastSleepSession.quality}") },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Star,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 )
             } else {
                 Text(
-                    text = "No sleep data yet",
-                    style = MaterialTheme.typography.headlineLarge.copy(
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface
+                    "No sleep data yet",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
         }
@@ -148,73 +141,40 @@ private fun SleepSummaryCard(lastSleepSession: SleepSession?) {
 }
 
 @Composable
-private fun NavigationButtons(
-    navController: NavController,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
+private fun ActionSection(navController: NavController) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+
         Button(
             onClick = { navController.navigate(NavigationDestinations.ALARM) },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.secondary
-            ),
-            elevation = ButtonDefaults.buttonElevation(
-                defaultElevation = 4.dp,
-                pressedElevation = 2.dp
-            )
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(16.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.Alarm, contentDescription = "Set Alarm")
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Set Alarm",
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.Medium
-                    )
-                )
-            }
+            Icon(Icons.Default.Alarm, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("Set Alarm", fontWeight = FontWeight.SemiBold)
         }
 
         OutlinedButton(
             onClick = { navController.navigate(NavigationDestinations.HISTORY) },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary)
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
         ) {
-             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.History, contentDescription = "View Sleep History", tint = MaterialTheme.colorScheme.secondary)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "View Sleep History",
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.Medium
-                    ),
-                    color = MaterialTheme.colorScheme.secondary
-                )
-            }
+            Icon(Icons.Default.History, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("Sleep History")
         }
-    }
-}
-
-@Preview(showBackground = true, showSystemUi = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
-@Composable
-private fun HomeScreenPreview() {
-    SleepieTheme(darkTheme = true) {
-        HomeScreen(
-            navController = rememberNavController()
-        )
     }
 }
 
 @Preview(showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun SleepSummaryCardPreview() {
+private fun HomePreview() {
     SleepieTheme(darkTheme = true) {
-        SleepSummaryCard(lastSleepSession = SleepSession(date = "Dec 23, 2025", duration = "7h 30m", quality = "Good"))
+        HomeScreen(rememberNavController())
     }
 }
