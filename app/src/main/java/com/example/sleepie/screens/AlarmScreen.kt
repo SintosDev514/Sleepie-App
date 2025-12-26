@@ -5,10 +5,31 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -16,12 +37,16 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.sleepie.MainActivity
 import com.example.sleepie.broadcastReceiver.AlarmReceiver
 import kotlinx.coroutines.delay
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 private const val PREFS_NAME = "sleepie_alarm_prefs"
@@ -100,7 +125,6 @@ fun AlarmScreen(navController: NavController) {
 
             if (!alarmActive) {
 
-                // --- Idle State ---
                 Text(
                     "Alarm will ring in",
                     color = MutedText,
@@ -184,7 +208,6 @@ fun AlarmScreen(navController: NavController) {
 
             } else {
 
-                // --- Active State ---
                 val totalDuration = (alarmTime - startTime).coerceAtLeast(1)
                 val progress = remainingTime.toFloat() / totalDuration
 
@@ -194,6 +217,22 @@ fun AlarmScreen(navController: NavController) {
                     fontWeight = FontWeight.Medium,
                     color = LightText
                 )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceAround
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("STARTS", color = MutedText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        Text(formatTimestamp(startTime), color = LightText, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("ENDS", color = MutedText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        Text(formatTimestamp(alarmTime), color = LightText, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(32.dp))
 
@@ -276,9 +315,14 @@ fun AlarmScreen(navController: NavController) {
     }
 }
 
+private fun formatTimestamp(timeInMillis: Long): String {
+    return SimpleDateFormat("hh:mm:ss a", Locale.US).format(Date(timeInMillis))
+}
+
 private fun formatRemainingTime(ms: Long): String {
     if (ms <= 0) return "00:00"
+    val hours = TimeUnit.MILLISECONDS.toHours(ms)
     val minutes = TimeUnit.MILLISECONDS.toMinutes(ms) % 60
     val seconds = TimeUnit.MILLISECONDS.toSeconds(ms) % 60
-    return "%02d:%02d".format(minutes, seconds)
+    return if (hours > 0) String.format("%d:%02d:%02d", hours, minutes, seconds) else String.format("%02d:%02d", minutes, seconds)
 }
