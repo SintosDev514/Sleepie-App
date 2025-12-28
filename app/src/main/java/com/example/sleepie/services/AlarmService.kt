@@ -29,25 +29,27 @@ class AlarmService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Intent to launch the full-screen alarm activity
+        // Release the WakeLock that was acquired by the AlarmReceiver.
+        WakeLockManager.release()
+
+        // --- Notification and Full-Screen Intent ---
         val fullScreenIntent = Intent(this, AlarmRingingActivity::class.java)
         val fullScreenPendingIntent = PendingIntent.getActivity(this, 0, fullScreenIntent, PendingIntent.FLAG_IMMUTABLE)
 
-        // Build the high-priority notification with the corrected action
         val notification: Notification = NotificationCompat.Builder(this, SleepieApplication.ALARM_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle("Wake Up!")
             .setContentText("Your alarm is ringing.")
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setFullScreenIntent(fullScreenPendingIntent, true) // This shows the activity over the lock screen
+            .setFullScreenIntent(fullScreenPendingIntent, true)
             .setOngoing(true)
-            .addAction(0, "Open Wake-up Screen", fullScreenPendingIntent) // This adds the button to the notification
+            .addAction(0, "Open Wake-up Screen", fullScreenPendingIntent)
             .build()
 
         startForeground(1001, notification)
 
-        // --- VIBRATION (Looping) ---
+        // --- VIBRATION ---
         vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             (getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
         } else {

@@ -33,7 +33,8 @@ fun SummaryScreen(navController: NavController, startTime: Long) {
 
     var selectedQuality by remember { mutableStateOf<String?>(null) }
 
-    val durationInMillis = (System.currentTimeMillis() - startTime).coerceAtLeast(0)
+    val endTime = System.currentTimeMillis()
+    val durationInMillis = (endTime - startTime).coerceAtLeast(0)
     val hours = TimeUnit.MILLISECONDS.toHours(durationInMillis)
     val minutes = TimeUnit.MILLISECONDS.toMinutes(durationInMillis) % 60
     val durationString = "%dh %02dm".format(hours, minutes)
@@ -114,6 +115,8 @@ fun SummaryScreen(navController: NavController, startTime: Long) {
 
                         val session = SleepSession(
                             date = date,
+                            startTime = startTime, // This was missing
+                            endTime = endTime,     // This was missing
                             duration = durationString,
                             quality = quality
                         )

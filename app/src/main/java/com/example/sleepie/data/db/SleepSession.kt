@@ -8,6 +8,8 @@ data class SleepSession(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val date: String,
+    val startTime: Long,
+    val endTime: Long,
     val duration: String,
     val quality: String
 )
