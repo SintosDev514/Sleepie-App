@@ -61,7 +61,7 @@ private const val PREFS_NAME = "sleepie_alarm_prefs"
 private const val KEY_ALARM_ACTIVE = "alarm_active"
 private const val KEY_ALARM_TIME = "alarm_time"
 private const val KEY_START_TIME = "start_time"
-private const val TEST_MINUTES = 2L
+private const val DEFAULT_SLEEP_HOURS = 8L // Changed from TEST_MINUTES
 
 private val DarkBackground = Color(0xFF121212)
 private val AccentViolet = Color(0xFF7C4DFF)
@@ -82,10 +82,9 @@ fun AlarmScreen(navController: NavController) {
     var remainingTime by remember { mutableStateOf(0L) }
     var showPermissionDialog by remember { mutableStateOf(false) }
 
-    // This is the definitive fix for the permission loop.
     val scheduleAlarmAction = {
         val now = System.currentTimeMillis()
-        val triggerTime = now + TimeUnit.MINUTES.toMillis(TEST_MINUTES)
+        val triggerTime = now + TimeUnit.HOURS.toMillis(DEFAULT_SLEEP_HOURS) // Changed from MINUTES
         val alarmIntent = Intent(context, AlarmReceiver::class.java).let { PendingIntent.getBroadcast(context, 0, it, PendingIntent.FLAG_IMMUTABLE) }
         val showAppIntent = Intent(context, MainActivity::class.java).let { PendingIntent.getActivity(context, 1, it, PendingIntent.FLAG_IMMUTABLE) }
         alarmManager.setAlarmClock(AlarmManager.AlarmClockInfo(triggerTime, showAppIntent), alarmIntent)
@@ -142,9 +141,9 @@ fun AlarmScreen(navController: NavController) {
         ) {
             Spacer(modifier = Modifier.height(48.dp))
             if (!alarmActive) {
-                Text("Alarm will ring in", color = MutedText, fontSize = 14.sp)
+                Text("Recommended sleep duration", color = MutedText, fontSize = 14.sp)
                 Spacer(modifier = Modifier.height(6.dp))
-                Text("$TEST_MINUTES minutes", fontSize = 44.sp, fontWeight = FontWeight.Bold, color = LightText)
+                Text("$DEFAULT_SLEEP_HOURS hours", fontSize = 44.sp, fontWeight = FontWeight.Bold, color = LightText) // Changed text
                 Spacer(modifier = Modifier.height(40.dp))
                 Button(
                     onClick = {
@@ -159,7 +158,7 @@ fun AlarmScreen(navController: NavController) {
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = AccentViolet)
                 ) {
-                    Text("Start Sleep", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Start 8-Hour Sleep", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) // Changed text
                 }
             } else {
                 val totalDuration = (alarmTime - startTime).coerceAtLeast(1)
@@ -227,5 +226,5 @@ private fun formatRemainingTime(ms: Long): String {
     val hours = TimeUnit.MILLISECONDS.toHours(ms)
     val minutes = TimeUnit.MILLISECONDS.toMinutes(ms) % 60
     val seconds = TimeUnit.MILLISECONDS.toSeconds(ms) % 60
-    return if (hours > 0) String.format("%d:%02d:%02d", hours, minutes, seconds) else String.format("00:%02d:%02d", minutes, seconds)
+    return String.format("%d:%02d:%02d", hours, minutes, seconds)
 }
