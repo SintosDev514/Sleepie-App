@@ -22,6 +22,9 @@ import com.example.sleepie.ui.theme.SleepieTheme
 class AlarmRingingActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val alarmLabel = intent.getStringExtra("ALARM_LABEL") ?: ""
+
         setContent {
             SleepieTheme {
                 Column(
@@ -30,19 +33,28 @@ class AlarmRingingActivity : ComponentActivity() {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text("Wake Up!", style = MaterialTheme.typography.displayLarge)
+                    if (alarmLabel.isNotEmpty()) {
+                        Text(alarmLabel, style = MaterialTheme.typography.headlineMedium)
+                    }
                     Button(
                         onClick = {
                             // Stop the alarm service (ringtone and vibration)
                             AlarmService.stopService(this@AlarmRingingActivity)
 
                             // Get the start time from SharedPreferences
-                            val prefs = getSharedPreferences("sleepie_alarm_prefs", Context.MODE_PRIVATE)
-                            val startTime = prefs.getLong("start_time", System.currentTimeMillis())
-                            prefs.edit().clear().apply()
+                            val prefs = getSharedPreferences("SleepiePrefs", Context.MODE_PRIVATE)
+                            val startTime = prefs.getLong("start_time", 0L)
 
                             // Start the main app and navigate to the summary screen
                             val intent = Intent(this@AlarmRingingActivity, MainActivity::class.java).apply {
-                                putExtra("navigate_to", "summary/$startTime")
+                                if (startTime != 0L) {
+                                    putExtra("navigate_to", "summary/$startTime")
+                                    // Clear the start time so it's not reused
+                                    prefs.edit().remove("start_time").apply()
+                                } else {
+                                    // If no start time, just go home
+                                    putExtra("navigate_to", "home")
+                                }
                                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                             }
                             startActivity(intent)

@@ -1,230 +1,312 @@
 package com.example.sleepie.screens
 
-import android.Manifest
-import android.app.AlarmManager
-import android.app.PendingIntent
+import android.app.*
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.os.Build
-import android.provider.Settings
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
+import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavController
 import com.example.sleepie.MainActivity
 import com.example.sleepie.broadcastReceiver.AlarmReceiver
-import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.concurrent.TimeUnit
+import java.util.*
 
-private const val PREFS_NAME = "sleepie_alarm_prefs"
-private const val KEY_ALARM_ACTIVE = "alarm_active"
-private const val KEY_ALARM_TIME = "alarm_time"
-private const val KEY_START_TIME = "start_time"
-private const val DEFAULT_SLEEP_HOURS = 8L // Changed from TEST_MINUTES
+/* -------------------- THEME -------------------- */
 
 private val DarkBackground = Color(0xFF121212)
-private val AccentViolet = Color(0xFF7C4DFF)
-private val ProgressViolet = Color(0xFF8E6CFF)
+private val Accent = Color(0xFF7C4DFF)
 private val LightText = Color.White
 private val MutedText = Color(0xFF9E9E9E)
 
+/* -------------------- SCREEN -------------------- */
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AlarmScreen(navController: NavController) {
+fun AddAlarmScreen(navController: NavController) {
+
     val context = LocalContext.current
-    val alarmManager = remember { context.getSystemService(Context.ALARM_SERVICE) as AlarmManager }
-    val prefs = remember { context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
+    val alarmManager =
+        remember { context.getSystemService(Context.ALARM_SERVICE) as AlarmManager }
 
-    var alarmActive by remember { mutableStateOf(prefs.getBoolean(KEY_ALARM_ACTIVE, false)) }
-    var alarmTime by remember { mutableStateOf(prefs.getLong(KEY_ALARM_TIME, 0L)) }
-    var startTime by remember { mutableStateOf(prefs.getLong(KEY_START_TIME, 0L)) }
-    var remainingTime by remember { mutableStateOf(0L) }
-    var showPermissionDialog by remember { mutableStateOf(false) }
+    var calendar by remember { mutableStateOf(Calendar.getInstance()) }
 
-    val scheduleAlarmAction = {
+    var repeatDaily by remember { mutableStateOf(false) }
+    var enableLabel by remember { mutableStateOf(false) }
+    var alarmLabel by remember { mutableStateOf("") }
+
+    /* -------------------- SAVE ALARM -------------------- */
+
+    fun saveAlarm() {
         val now = System.currentTimeMillis()
-        val triggerTime = now + TimeUnit.HOURS.toMillis(DEFAULT_SLEEP_HOURS) // Changed from MINUTES
-        val alarmIntent = Intent(context, AlarmReceiver::class.java).let { PendingIntent.getBroadcast(context, 0, it, PendingIntent.FLAG_IMMUTABLE) }
-        val showAppIntent = Intent(context, MainActivity::class.java).let { PendingIntent.getActivity(context, 1, it, PendingIntent.FLAG_IMMUTABLE) }
-        alarmManager.setAlarmClock(AlarmManager.AlarmClockInfo(triggerTime, showAppIntent), alarmIntent)
-        prefs.edit().apply {
-            putBoolean(KEY_ALARM_ACTIVE, true)
-            putLong(KEY_START_TIME, now)
-            putLong(KEY_ALARM_TIME, triggerTime)
+
+        // Prevent past alarms
+        if (calendar.timeInMillis <= now) {
+            calendar.add(Calendar.DAY_OF_YEAR, 1)
+        }
+
+        val triggerTime = calendar.timeInMillis
+
+        val intent = Intent(context, AlarmReceiver::class.java).apply {
+            putExtra("ALARM_LABEL", if (enableLabel) alarmLabel else "")
+        }
+
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            triggerTime.toInt(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val showAppIntent = PendingIntent.getActivity(
+            context,
+            0,
+            Intent(context, MainActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE
+        )
+
+        if (repeatDaily) {
+            alarmManager.setRepeating(
+                AlarmManager.RTC_WAKEUP,
+                triggerTime,
+                AlarmManager.INTERVAL_DAY,
+                pendingIntent
+            )
+        } else {
+            alarmManager.setAlarmClock(
+                AlarmManager.AlarmClockInfo(triggerTime, showAppIntent),
+                pendingIntent
+            )
+        }
+
+        // Save alarm details to SharedPreferences for the dashboard
+        val prefs = context.getSharedPreferences("SleepiePrefs", Context.MODE_PRIVATE)
+        with(prefs.edit()) {
+            putLong("next_alarm_time", triggerTime)
+            putString("next_alarm_label", alarmLabel)
             apply()
         }
-        alarmActive = true
-        startTime = now
-        alarmTime = triggerTime
+
+        navController.popBackStack()
     }
 
-    val settingsLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult(),
-        onResult = { scheduleAlarmAction() }
-    )
-
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-        onResult = { isGranted ->
-            if (isGranted) {
-                scheduleAlarmAction()
-            }
-        }
-    )
-
-    LaunchedEffect(alarmActive) {
-        if (alarmActive) {
-            while (true) {
-                remainingTime = (alarmTime - System.currentTimeMillis()).coerceAtLeast(0)
-                if (remainingTime == 0L) break
-                delay(1000)
-            }
-        }
-    }
-
-    fun cancelAlarm() {
-        val intent = Intent(context, AlarmReceiver::class.java)
-        val pendingIntent = PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_IMMUTABLE)
-        alarmManager.cancel(pendingIntent)
-        prefs.edit().clear().apply()
-        alarmActive = false
-    }
+    /* -------------------- UI -------------------- */
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Sleep Alarm", fontWeight = FontWeight.SemiBold) }, colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkBackground, titleContentColor = LightText)) },
-        containerColor = DarkBackground
+        containerColor = DarkBackground,
+        topBar = {
+            TopAppBar(
+                title = { Text("Add Alarm", fontWeight = FontWeight.SemiBold) },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = DarkBackground,
+                    titleContentColor = LightText
+                )
+            )
+        }
     ) { padding ->
+
         Column(
-            modifier = Modifier.padding(padding).padding(horizontal = 24.dp).fillMaxSize(),
+            modifier = Modifier
+                .padding(padding)
+                .padding(horizontal = 24.dp)
+                .fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(48.dp))
-            if (!alarmActive) {
-                Text("Recommended sleep duration", color = MutedText, fontSize = 14.sp)
-                Spacer(modifier = Modifier.height(6.dp))
-                Text("$DEFAULT_SLEEP_HOURS hours", fontSize = 44.sp, fontWeight = FontWeight.Bold, color = LightText) // Changed text
-                Spacer(modifier = Modifier.height(40.dp))
-                Button(
-                    onClick = {
-                        val hasNotificationPerm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED else true
-                        val canScheduleExact = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) alarmManager.canScheduleExactAlarms() else true
 
-                        when {
-                            !hasNotificationPerm -> notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                            !canScheduleExact -> showPermissionDialog = true
-                            else -> scheduleAlarmAction()
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = AccentViolet)
-                ) {
-                    Text("Start 8-Hour Sleep", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) // Changed text
-                }
-            } else {
-                val totalDuration = (alarmTime - startTime).coerceAtLeast(1)
-                val progress = remainingTime.toFloat() / totalDuration
-                Text("Sleeping…", fontSize = 18.sp, fontWeight = FontWeight.Medium, color = LightText)
-                Spacer(modifier = Modifier.height(24.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("STARTS", color = MutedText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        Text(formatTimestamp(startTime), color = LightText, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("ENDS", color = MutedText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        Text(formatTimestamp(alarmTime), color = LightText, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-                Spacer(modifier = Modifier.height(32.dp))
-                Box(modifier = Modifier.size(240.dp), contentAlignment = Alignment.Center) {
-                    Canvas(Modifier.fillMaxSize()) { drawCircle(color = Color.White.copy(alpha = 0.08f), style = Stroke(22f)) }
-                    Canvas(Modifier.fillMaxSize()) { drawArc(color = ProgressViolet, startAngle = -90f, sweepAngle = 360f * progress, useCenter = false, style = Stroke(width = 22f, cap = StrokeCap.Round)) }
-                    Text(formatRemainingTime(remainingTime), fontSize = 32.sp, fontWeight = FontWeight.Bold, color = LightText)
-                }
-                Spacer(modifier = Modifier.weight(1f))
-                Button(
-                    onClick = {
-                        val sessionStartTime = prefs.getLong(KEY_START_TIME, System.currentTimeMillis())
-                        cancelAlarm()
-                        navController.navigate("summary/$sessionStartTime") { popUpTo("home") { inclusive = true } }
-                    },
-                    modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = AccentViolet)
-                ) { Text("I Woke Up", fontWeight = FontWeight.SemiBold) }
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = { cancelAlarm() },
-                    modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(18.dp)
-                ) { Text("Cancel Alarm", color = MutedText) }
-                Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(32.dp))
+
+            TimeDatePicker(calendar) { calendar = it }
+
+            Spacer(Modifier.height(32.dp))
+
+            SettingRow("Add Label", enableLabel) {
+                enableLabel = it
             }
-        }
-    }
 
-    if (showPermissionDialog) {
-        AlertDialog(
-            onDismissRequest = { showPermissionDialog = false },
-            title = { Text("Permission Required") },
-            text = { Text("To set reliable alarms, Sleepie needs the 'Alarms & reminders' permission. Please find and enable it for Sleepie in your system settings.") },
-            confirmButton = {
-                Button(onClick = {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply { data = Uri.parse("package:${context.packageName}") }
-                        settingsLauncher.launch(intent)
-                    }
-                    showPermissionDialog = false
-                }) { Text("Open Settings") }
-            },
-            dismissButton = { Button(onClick = { showPermissionDialog = false }) { Text("Done") } }
-        )
+            if (enableLabel) {
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = alarmLabel,
+                    onValueChange = { alarmLabel = it },
+                    label = { Text("Alarm Label") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            SettingRow("Repeat Daily", repeatDaily) {
+                repeatDaily = it
+            }
+
+            Spacer(Modifier.weight(1f))
+
+            Button(
+                onClick = { saveAlarm() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Accent)
+            ) {
+                Text("Save Alarm", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
+
+            Spacer(Modifier.height(20.dp))
+        }
     }
 }
 
-private fun formatTimestamp(timeInMillis: Long): String = SimpleDateFormat("hh:mm:ss a", Locale.US).format(Date(timeInMillis))
+/* -------------------- TIME + DATE PICKER -------------------- */
 
-private fun formatRemainingTime(ms: Long): String {
-    if (ms <= 0) return "00:00:00"
-    val hours = TimeUnit.MILLISECONDS.toHours(ms)
-    val minutes = TimeUnit.MILLISECONDS.toMinutes(ms) % 60
-    val seconds = TimeUnit.MILLISECONDS.toSeconds(ms) % 60
-    return String.format("%d:%02d:%02d", hours, minutes, seconds)
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimeDatePicker(
+    calendar: Calendar,
+    onUpdate: (Calendar) -> Unit
+) {
+
+    var showTimePicker by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    val timeState = rememberTimePickerState(
+        initialHour = calendar.get(Calendar.HOUR_OF_DAY),
+        initialMinute = calendar.get(Calendar.MINUTE)
+    )
+
+    val dateState = rememberDatePickerState(
+        initialSelectedDateMillis = calendar.timeInMillis
+    )
+
+    if (showTimePicker) {
+        PickerDialog(
+            title = "Select Time",
+            onDismiss = { showTimePicker = false },
+            onConfirm = {
+                val newCal = calendar.clone() as Calendar
+                newCal.set(Calendar.HOUR_OF_DAY, timeState.hour)
+                newCal.set(Calendar.MINUTE, timeState.minute)
+                onUpdate(newCal)
+                showTimePicker = false
+            }
+        ) {
+            TimePicker(state = timeState)
+        }
+    }
+
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    dateState.selectedDateMillis?.let { millis ->
+                        // The millis from the date picker is for midnight UTC.
+                        val selectedUtcCalendar = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+                            timeInMillis = millis
+                        }
+                        // Apply the selected year, month, and day to our existing
+                        // calendar, which preserves the user's selected time and timezone.
+                        val newCal = calendar.clone() as Calendar
+                        newCal.set(Calendar.YEAR, selectedUtcCalendar.get(Calendar.YEAR))
+                        newCal.set(Calendar.MONTH, selectedUtcCalendar.get(Calendar.MONTH))
+                        newCal.set(Calendar.DAY_OF_MONTH, selectedUtcCalendar.get(Calendar.DAY_OF_MONTH))
+                        onUpdate(newCal)
+                    }
+                    showDatePicker = false
+                }) { Text("OK", color = Accent) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel", color = Accent)
+                }
+            }
+        ) { DatePicker(state = dateState) }
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceAround
+    ) {
+        PickerCard("TIME", formatTime(calendar)) { showTimePicker = true }
+        PickerCard("DATE", formatDate(calendar)) { showDatePicker = true }
+    }
+}
+
+/* -------------------- COMPONENTS -------------------- */
+
+@Composable
+private fun PickerCard(title: String, value: String, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier.clickable { onClick() },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(title, color = MutedText, fontSize = 12.sp)
+        Text(value, color = LightText, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun SettingRow(
+    title: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(title, color = LightText, fontSize = 16.sp)
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+/* -------------------- HELPERS -------------------- */
+
+private fun formatTime(calendar: Calendar): String =
+    SimpleDateFormat("hh:mm a", Locale.getDefault()).format(calendar.time)
+
+private fun formatDate(calendar: Calendar): String =
+    SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(calendar.time)
+
+@Composable
+private fun PickerDialog(
+    title: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = DarkBackground
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(title, color = LightText)
+                Spacer(Modifier.height(12.dp))
+                content()
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Cancel", color = Accent) }
+                    TextButton(onClick = onConfirm) { Text("OK", color = Accent) }
+                }
+            }
+        }
+    }
 }

@@ -32,19 +32,25 @@ class AlarmService : Service() {
         // Release the WakeLock that was acquired by the AlarmReceiver.
         WakeLockManager.release()
 
-        // --- Notification and Full-Screen Intent ---
-        val fullScreenIntent = Intent(this, AlarmRingingActivity::class.java)
-        val fullScreenPendingIntent = PendingIntent.getActivity(this, 0, fullScreenIntent, PendingIntent.FLAG_IMMUTABLE)
+        // Get alarm label from intent
+        val alarmLabel = intent?.getStringExtra("ALARM_LABEL") ?: ""
+
+        // --- Notification and Content Intent ---
+        val contentIntent = Intent(this, AlarmRingingActivity::class.java).apply {
+            putExtra("ALARM_LABEL", alarmLabel)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val contentPendingIntent = PendingIntent.getActivity(this, 0, contentIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
 
         val notification: Notification = NotificationCompat.Builder(this, SleepieApplication.ALARM_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle("Wake Up!")
-            .setContentText("Your alarm is ringing.")
+            .setContentText(if (alarmLabel.isNotEmpty()) alarmLabel else "Your alarm is ringing.")
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setFullScreenIntent(fullScreenPendingIntent, true)
+            .setContentIntent(contentPendingIntent) // This will open the activity when tapped
+            .setAutoCancel(true) // Dismiss the notification when tapped
             .setOngoing(true)
-            .addAction(0, "Open Wake-up Screen", fullScreenPendingIntent)
             .build()
 
         startForeground(1001, notification)

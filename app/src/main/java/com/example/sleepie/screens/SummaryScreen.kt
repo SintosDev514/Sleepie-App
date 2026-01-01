@@ -35,9 +35,18 @@ fun SummaryScreen(navController: NavController, startTime: Long) {
 
     val endTime = System.currentTimeMillis()
     val durationInMillis = (endTime - startTime).coerceAtLeast(0)
-    val hours = TimeUnit.MILLISECONDS.toHours(durationInMillis)
+
+    val days = TimeUnit.MILLISECONDS.toDays(durationInMillis)
+    val hours = TimeUnit.MILLISECONDS.toHours(durationInMillis) % 24
     val minutes = TimeUnit.MILLISECONDS.toMinutes(durationInMillis) % 60
-    val durationString = "%dh %02dm".format(hours, minutes)
+    val seconds = TimeUnit.MILLISECONDS.toSeconds(durationInMillis) % 60
+
+    val durationString = when {
+        days > 0 -> String.format("%dd %02dh %02dm", days, hours, minutes)
+        hours > 0 -> String.format("%dh %02dm %02ds", hours, minutes, seconds)
+        minutes > 0 -> String.format("%dm %02ds", minutes, seconds)
+        else -> String.format("%ds", seconds)
+    }
 
     Scaffold(
         topBar = {
@@ -115,8 +124,8 @@ fun SummaryScreen(navController: NavController, startTime: Long) {
 
                         val session = SleepSession(
                             date = date,
-                            startTime = startTime, // This was missing
-                            endTime = endTime,     // This was missing
+                            startTime = startTime,
+                            endTime = endTime,
                             duration = durationString,
                             quality = quality
                         )
