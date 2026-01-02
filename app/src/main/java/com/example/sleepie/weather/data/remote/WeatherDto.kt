@@ -1,32 +1,21 @@
 package com.example.sleepie.weather.data.remote
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+/**
+ * Data Transfer Object for the OpenWeatherMap Current Weather API (data/2.5/weather).
+ * This structure matches the JSON response from the correct endpoint.
+ */
 @Serializable
 data class WeatherResponse(
-    val current: CurrentWeather,
-    val daily: List<DailyWeather>
+    val main: Main,
+    val weather: List<WeatherDescription>,
+    val name: String
 )
 
 @Serializable
-data class CurrentWeather(
-    val temp: Double,
-    val weather: List<WeatherDescription>
-)
-
-@Serializable
-data class DailyWeather(
-    @SerialName("dt") val timestamp: Long,
-    val temp: Temperature,
-    val weather: List<WeatherDescription>
-)
-
-@Serializable
-data class Temperature(
-    val day: Double,
-    val min: Double,
-    val max: Double
+data class Main(
+    val temp: Double
 )
 
 @Serializable

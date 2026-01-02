@@ -1,6 +1,5 @@
 package com.example.sleepie.screens
 
-import androidx.compose.material3.MaterialTheme
 import android.Manifest
 import android.app.AlarmManager
 import android.app.Application
@@ -12,16 +11,18 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ShowChart
+import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -36,6 +37,7 @@ import com.example.sleepie.viewModel.SleepViewModel
 import com.example.sleepie.viewModel.SleepViewModelFactory
 import com.example.sleepie.weather.domain.weather.WeatherCard
 import com.example.sleepie.weather.domain.weather.WeatherViewModel
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -68,9 +70,11 @@ fun HomeScreen(
         mutableStateOf(prefs.getString("next_alarm_label", "") ?: "")
     }
 
-    val hasAlarm = nextAlarmTime > System.currentTimeMillis()
+    var startTime by remember {
+        mutableLongStateOf(prefs.getLong("start_time", 0L))
+    }
 
-    /* -------- LOCATION PERMISSIONS (NO ACCOMPANIST) -------- */
+    val hasAlarm = nextAlarmTime > System.currentTimeMillis()
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -84,10 +88,17 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         permissionLauncher.launch(
             arrayOf(
-                Manifest.permission.ACCESS_COARSE_LOCATION,
-                Manifest.permission.ACCESS_FINE_LOCATION
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
             )
         )
+    }
+
+    LaunchedEffect(navController.currentBackStackEntry) {
+        // Refresh data when returning to the screen
+        nextAlarmTime = prefs.getLong("next_alarm_time", 0L)
+        nextAlarmLabel = prefs.getString("next_alarm_label", "") ?: ""
+        startTime = prefs.getLong("start_time", 0L)
     }
 
     Scaffold(
@@ -97,8 +108,9 @@ fun HomeScreen(
         Column(
             modifier = Modifier
                 .padding(padding)
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+                .padding(horizontal = 20.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(28.dp)
         ) {
 
             GreetingSection()
@@ -107,8 +119,6 @@ fun HomeScreen(
                 state = weatherViewModel.state,
                 onRefresh = { weatherViewModel.loadWeatherInfo() }
             )
-
-            SleepScoreCard(lastSleep)
 
             AlarmDashboardCard(
                 alarmTime = nextAlarmTime,
@@ -119,7 +129,6 @@ fun HomeScreen(
                         context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
                     val intent = Intent(context, AlarmReceiver::class.java)
-
                     val pendingIntent = PendingIntent.getBroadcast(
                         context,
                         nextAlarmTime.toInt(),
@@ -139,17 +148,75 @@ fun HomeScreen(
                 }
             )
 
-            SleepStatsRow(lastSleep)
+            val sleepTrend = remember(sleepSessions) {
+                calculateSleepTrend(sleepSessions)
+            }
+
+            SleepStatsRow(lastSleep, sleepTrend)
+
+            if (startTime > 0) {
+                Button(
+                    onClick = { /* Already sleeping */ },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    enabled = false
+                ) {
+                    Text("Sleeping...", fontWeight = FontWeight.SemiBold)
+                }
+            } else {
+                Button(
+                    onClick = {
+                        val newStartTime = System.currentTimeMillis()
+                        prefs.edit {
+                            putLong("start_time", newStartTime)
+                        }
+                        startTime = newStartTime
+                    },
+                    enabled = hasAlarm, // ✅ FIX: Only enable if there's an alarm
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(18.dp)
+                ) {
+                    Icon(Icons.Filled.Bedtime, contentDescription = null)
+                    Spacer(Modifier.width(10.dp))
+                    Text("Start Sleep", fontWeight = FontWeight.SemiBold)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(96.dp))
         }
     }
 }
 
+/* ---------------- HELPERS ---------------- */
+
+private fun calculateSleepTrend(sessions: List<SleepSession>): String {
+    if (sessions.size < 2) return "--"
+
+    val lastDuration = sessions[0].endTime - sessions[0].startTime
+    val previousSessions = sessions.drop(1)
+    val averageDuration = previousSessions.map { it.endTime - it.startTime }.average()
+
+    return when {
+        lastDuration > averageDuration * 1.1 -> "Improving"
+        lastDuration < averageDuration * 0.9 -> "Declining"
+        else -> "Stable"
+    }
+}
+
+
 /* ---------------- TOP BAR ---------------- */
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeTopBar() {
-    TopAppBar(
-        title = { Text("Sleepie", fontWeight = FontWeight.Bold) }
+    CenterAlignedTopAppBar(
+        title = {
+            Text(
+                text = "Sleepie",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        }
     )
 }
 
@@ -157,68 +224,20 @@ private fun HomeTopBar() {
 
 @Composable
 private fun GreetingSection() {
-    Column {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            "Good Evening 🌙",
+            text = "Good Evening",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
         Text(
-            "Here’s your sleep overview",
+            text = "Wind down and prepare for rest",
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
 
-/* ---------------- SLEEP SCORE ---------------- */
-
-@Composable
-private fun SleepScoreCard(lastSleep: SleepSession?) {
-
-    val hasData = lastSleep != null
-
-    val score = when (lastSleep?.quality) {
-        "Excellent" -> 92
-        "Good" -> 80
-        "Fair" -> 65
-        else -> 0
-    }
-
-    val progress by animateFloatAsState(
-        targetValue = if (hasData) score / 100f else 0f,
-        label = "SleepScore"
-    )
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (hasData)
-                MaterialTheme.colorScheme.primaryContainer
-            else
-                MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-
-            Text("Last Sleep", fontWeight = FontWeight.SemiBold)
-
-            Spacer(Modifier.height(12.dp))
-
-            CircularScoreProgress(progress, score, hasData)
-
-            Spacer(Modifier.height(12.dp))
-
-            Text(
-                if (hasData) lastSleep!!.quality else "No sleep recorded yet",
-                fontWeight = FontWeight.Bold
-            )
-        }
-    }
-}
 
 /* ---------------- ALARM CARD ---------------- */
 
@@ -229,44 +248,106 @@ private fun AlarmDashboardCard(
     hasAlarm: Boolean,
     onCancel: () -> Unit
 ) {
-    Card(
+    ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp)
+        shape = RoundedCornerShape(28.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
+        if (hasAlarm) {
+            // UI for when an alarm is set
+            var remainingTime by remember { mutableStateOf(alarmTime - System.currentTimeMillis()) }
+            val totalTime = remember(alarmTime) {
+                (alarmTime - System.currentTimeMillis()).coerceAtLeast(1L)
+            }
 
-            Text("Next Alarm", fontWeight = FontWeight.SemiBold)
+            LaunchedEffect(alarmTime) {
+                while (remainingTime > 0) {
+                    delay(1000)
+                    remainingTime = alarmTime - System.currentTimeMillis()
+                }
+            }
 
-            if (hasAlarm) {
+            val progress = (remainingTime.toFloat() / totalTime).coerceIn(0f, 1f)
 
-                Text(
-                    SimpleDateFormat("hh:mm a", Locale.getDefault())
-                        .format(Date(alarmTime)),
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.Bold
-                )
-
-                if (alarmLabel.isNotEmpty()) {
-                    Text(alarmLabel)
+            Row(
+                modifier = Modifier
+                    .padding(24.dp)
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Next Alarm",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(alarmTime)),
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (alarmLabel.isNotBlank()) {
+                        Text(
+                            text = alarmLabel,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                    TextButton(onClick = onCancel) {
+                        Text("Cancel alarm")
+                    }
                 }
 
-                TextButton(onClick = onCancel) {
-                    Text("Cancel Alarm")
+                Box(
+                    modifier = Modifier.size(100.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val indicatorColor = MaterialTheme.colorScheme.primary
+                    val trackColor = MaterialTheme.colorScheme.surfaceVariant
+
+                    CircularProgressIndicator(
+                        progress = progress,
+                        modifier = Modifier.fillMaxSize(),
+                        color = indicatorColor,
+                        trackColor = trackColor,
+                        strokeWidth = 10.dp,
+                        strokeCap = StrokeCap.Round
+                    )
+
+                    val hours = (remainingTime / (1000 * 60 * 60)) % 24
+                    val minutes = (remainingTime / (1000 * 60)) % 60
+                    val seconds = (remainingTime / 1000) % 60
+
+                    val displayTime = when {
+                        hours > 0 -> String.format("%dh %02dm", hours, minutes)
+                        minutes > 0 -> String.format("%dm %02ds", minutes, seconds)
+                        else -> String.format("%ds", seconds.coerceAtLeast(0))
+                    }
+
+                    Text(
+                        text = displayTime,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
-
-            } else {
-
+            }
+        } else {
+            // UI for when no alarm is set
+            Column(
+                modifier = Modifier.padding(28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
                 Icon(
                     Icons.Filled.Schedule,
                     contentDescription = null,
-                    modifier = Modifier.size(42.dp)
+                    modifier = Modifier.size(52.dp),
+                    tint = MaterialTheme.colorScheme.primary
                 )
-
-                Text("No alarm set yet", fontWeight = FontWeight.Medium)
+                Text(
+                    text = "No alarm scheduled",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
             }
         }
     }
@@ -275,84 +356,42 @@ private fun AlarmDashboardCard(
 /* ---------------- STATS ---------------- */
 
 @Composable
-private fun SleepStatsRow(lastSleep: SleepSession?) {
+private fun SleepStatsRow(lastSleep: SleepSession?, trend: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         StatCard("Duration", lastSleep?.duration ?: "--", Icons.Filled.Schedule)
         StatCard("Quality", lastSleep?.quality ?: "--", Icons.Filled.Star)
-        StatCard("Consistency", "Stable", Icons.AutoMirrored.Filled.ShowChart)
+
     }
 }
 
 @Composable
-private fun StatCard(
+private fun RowScope.StatCard(
     title: String,
     value: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector
 ) {
-    Card(
-        modifier = Modifier.width(110.dp),
-        shape = RoundedCornerShape(20.dp)
+    ElevatedCard(
+        modifier = Modifier.weight(1f),
+        shape = RoundedCornerShape(22.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier.padding(18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(icon, contentDescription = null)
-            Spacer(Modifier.height(6.dp))
-            Text(value, fontWeight = FontWeight.Bold)
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
             Text(
-                title,
-                style = MaterialTheme.typography.labelMedium
+                text = value,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
             )
         }
-    }
-}
-
-/* ---------------- CIRCULAR PROGRESS ---------------- */
-
-@Composable
-private fun CircularScoreProgress(
-    progress: Float,
-    score: Int,
-    hasData: Boolean
-) {
-    val primaryColor = MaterialTheme.colorScheme.primary
-
-    Box(
-        modifier = Modifier.size(130.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-
-            drawArc(
-                color = Color.LightGray.copy(alpha = 0.3f),
-                startAngle = 0f,
-                sweepAngle = 360f,
-                useCenter = false,
-                style = androidx.compose.ui.graphics.drawscope.Stroke(16f)
-            )
-
-            if (hasData) {
-                drawArc(
-                    color = primaryColor,
-                    startAngle = -90f,
-                    sweepAngle = 360f * progress,
-                    useCenter = false,
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(
-                        16f,
-                        cap = StrokeCap.Round
-                    )
-                )
-            }
-        }
-
-        Text(
-            if (hasData) "$score" else "--",
-            style = MaterialTheme.typography.displaySmall,
-            fontWeight = FontWeight.Bold
-        )
     }
 }

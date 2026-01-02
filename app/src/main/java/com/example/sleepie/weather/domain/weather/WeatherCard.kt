@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -15,13 +16,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.sleepie.R
-import java.text.SimpleDateFormat
-import java.util.*
 
 @Composable
 fun WeatherCard(state: WeatherState, onRefresh: () -> Unit) {
@@ -33,57 +31,83 @@ fun WeatherCard(state: WeatherState, onRefresh: () -> Unit) {
         )
     ) {
         Column(
-            modifier = Modifier.padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier.padding(16.dp)
         ) {
+            // Card Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Today's Weather", fontWeight = FontWeight.SemiBold)
+                Text("Current Weather", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
                 IconButton(onClick = onRefresh) {
-                    Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                    Icon(Icons.Filled.Refresh, contentDescription = "Refresh Weather")
                 }
             }
 
-            if (state.isLoading) {
-                CircularProgressIndicator()
-            } else if (state.error != null) {
-                Text(state.error, color = MaterialTheme.colorScheme.error)
-            } else if (state.weatherInfo != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceAround,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Image(
-                            painter = painterResource(id = getWeatherIcon(state.weatherInfo.current.weather.first().icon)),
-                            contentDescription = null,
-                            modifier = Modifier.size(80.dp)
-                        )
-                        Text(
-                            "${state.weatherInfo.current.temp.toInt()}°C",
-                            style = MaterialTheme.typography.displayMedium
-                        )
-                        Text(state.weatherInfo.current.weather.first().main)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Card Body
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                when {
+                    state.isLoading -> {
+                        CircularProgressIndicator()
                     }
-                    Spacer(Modifier.width(16.dp))
-                    Column {
-                        state.weatherInfo.daily.take(7).forEach {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(SimpleDateFormat("EEE", Locale.getDefault()).format(Date(it.timestamp * 1000)))
-                                Text("${it.temp.max.toInt()}° / ${it.temp.min.toInt()}°")
+                    state.error != null -> {
+                        Text(state.error, color = MaterialTheme.colorScheme.error)
+                    }
+                    state.weatherInfo != null -> {
+                        // Weather Data Display
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceAround
+                        ) {
+                            // Icon and Temperature
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Image(
+                                    painter = painterResource(id = getWeatherIcon(state.weatherInfo.weather.first().icon)),
+                                    contentDescription = state.weatherInfo.weather.first().description,
+                                    modifier = Modifier.size(80.dp)
+                                )
+                                Text(
+                                    text = "${state.weatherInfo.main.temp.toInt()}°C",
+                                    style = MaterialTheme.typography.displayMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            // Location and Description
+                            Column(horizontalAlignment = Alignment.End) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Filled.LocationOn,
+                                        contentDescription = "Location",
+                                        modifier = Modifier.size(20.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = state.weatherInfo.name,
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Text(
+                                    text = state.weatherInfo.weather.first().main,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
                     }
+                    else -> {
+                        Text("No weather data available.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
-            } else {
-                Text("No weather data available.")
             }
         }
     }

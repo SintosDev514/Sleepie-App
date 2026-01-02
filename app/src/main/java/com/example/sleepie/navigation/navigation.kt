@@ -2,6 +2,7 @@ package com.example.sleepie.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -16,15 +17,17 @@ import com.example.sleepie.weather.domain.weather.WeatherViewModel
 @Composable
 fun SleepieNavGraph(
     navController: NavHostController,
-    modifier: Modifier = Modifier,
-    weatherViewModel: WeatherViewModel
+    modifier: Modifier = Modifier
 ) {
     NavHost(
         navController = navController,
         startDestination = NavigationDestinations.HOME,
         modifier = modifier
     ) {
-        composable(NavigationDestinations.HOME) { HomeScreen(navController, weatherViewModel) }
+        composable(NavigationDestinations.HOME) { 
+            val weatherViewModel = hiltViewModel<WeatherViewModel>()
+            HomeScreen(navController, weatherViewModel)
+        }
         composable(NavigationDestinations.ALARM) { AddAlarmScreen(navController) }
         composable(NavigationDestinations.HISTORY) { HistoryScreen(navController) }
 

@@ -7,9 +7,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.sleepie.weather.domain.location.LocationTracker
 import com.example.sleepie.weather.data.repository.WeatherRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class WeatherViewModel(
+@HiltViewModel
+class WeatherViewModel @Inject constructor(
     private val repository: WeatherRepository,
     private val locationTracker: LocationTracker
 ) : ViewModel() {
@@ -23,13 +26,20 @@ class WeatherViewModel(
                 isLoading = true,
                 error = null
             )
-            locationTracker.getCurrentLocation()?.let {
-                val result = repository.getWeatherData(it.latitude, it.longitude)
-                state = state.copy(
-                    weatherInfo = result,
-                    isLoading = false,
-                    error = if (result == null) "Error fetching weather" else null
-                )
+            locationTracker.getCurrentLocation()?.let { location ->
+                repository.getWeatherData(location.latitude, location.longitude)
+                    .onSuccess {
+                        state = state.copy(
+                            weatherInfo = it,
+                            isLoading = false
+                        )
+                    }
+                    .onFailure {
+                        state = state.copy(
+                            isLoading = false,
+                            error = "Error: ${it.message}"
+                        )
+                    }
             } ?: run {
                 state = state.copy(
                     isLoading = false,
