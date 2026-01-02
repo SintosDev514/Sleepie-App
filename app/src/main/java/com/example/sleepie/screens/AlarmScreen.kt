@@ -10,7 +10,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -21,13 +20,6 @@ import com.example.sleepie.MainActivity
 import com.example.sleepie.broadcastReceiver.AlarmReceiver
 import java.text.SimpleDateFormat
 import java.util.*
-
-/* -------------------- THEME -------------------- */
-
-private val DarkBackground = Color(0xFF121212)
-private val Accent = Color(0xFF7C4DFF)
-private val LightText = Color.White
-private val MutedText = Color(0xFF9E9E9E)
 
 /* -------------------- SCREEN -------------------- */
 
@@ -46,7 +38,6 @@ fun AddAlarmScreen(navController: NavController) {
     var alarmLabel by remember { mutableStateOf("") }
 
     /* -------------------- SAVE ALARM -------------------- */
-
     fun saveAlarm() {
         val now = System.currentTimeMillis()
 
@@ -101,16 +92,10 @@ fun AddAlarmScreen(navController: NavController) {
     }
 
     /* -------------------- UI -------------------- */
-
     Scaffold(
-        containerColor = DarkBackground,
         topBar = {
             TopAppBar(
-                title = { Text("Add Alarm", fontWeight = FontWeight.SemiBold) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DarkBackground,
-                    titleContentColor = LightText
-                )
+                title = { Text("Add Alarm", fontWeight = FontWeight.SemiBold) }
             )
         }
     ) { padding ->
@@ -129,9 +114,7 @@ fun AddAlarmScreen(navController: NavController) {
 
             Spacer(Modifier.height(32.dp))
 
-            SettingRow("Add Label", enableLabel) {
-                enableLabel = it
-            }
+            SettingRow("Add Label", enableLabel) { enableLabel = it }
 
             if (enableLabel) {
                 Spacer(Modifier.height(12.dp))
@@ -145,9 +128,7 @@ fun AddAlarmScreen(navController: NavController) {
 
             Spacer(Modifier.height(24.dp))
 
-            SettingRow("Repeat Daily", repeatDaily) {
-                repeatDaily = it
-            }
+            SettingRow("Repeat Daily", repeatDaily) { repeatDaily = it }
 
             Spacer(Modifier.weight(1f))
 
@@ -156,8 +137,7 @@ fun AddAlarmScreen(navController: NavController) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                shape = RoundedCornerShape(18.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Accent)
+                shape = RoundedCornerShape(18.dp)
             ) {
                 Text("Save Alarm", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             }
@@ -210,12 +190,9 @@ private fun TimeDatePicker(
             confirmButton = {
                 TextButton(onClick = {
                     dateState.selectedDateMillis?.let { millis ->
-                        // The millis from the date picker is for midnight UTC.
                         val selectedUtcCalendar = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
                             timeInMillis = millis
                         }
-                        // Apply the selected year, month, and day to our existing
-                        // calendar, which preserves the user's selected time and timezone.
                         val newCal = calendar.clone() as Calendar
                         newCal.set(Calendar.YEAR, selectedUtcCalendar.get(Calendar.YEAR))
                         newCal.set(Calendar.MONTH, selectedUtcCalendar.get(Calendar.MONTH))
@@ -223,11 +200,11 @@ private fun TimeDatePicker(
                         onUpdate(newCal)
                     }
                     showDatePicker = false
-                }) { Text("OK", color = Accent) }
+                }) { Text("OK") }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) {
-                    Text("Cancel", color = Accent)
+                    Text("Cancel")
                 }
             }
         ) { DatePicker(state = dateState) }
@@ -250,8 +227,8 @@ private fun PickerCard(title: String, value: String, onClick: () -> Unit) {
         modifier = Modifier.clickable { onClick() },
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(title, color = MutedText, fontSize = 12.sp)
-        Text(value, color = LightText, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+        Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+        Text(value, fontSize = 26.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -266,8 +243,11 @@ private fun SettingRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(title, color = LightText, fontSize = 16.sp)
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Text(title, fontSize = 16.sp)
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange
+        )
     }
 }
 
@@ -288,14 +268,13 @@ private fun PickerDialog(
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = DarkBackground
+            shape = RoundedCornerShape(16.dp)
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(title, color = LightText)
+                Text(title, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(12.dp))
                 content()
                 Spacer(Modifier.height(12.dp))
@@ -303,8 +282,8 @@ private fun PickerDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
                 ) {
-                    TextButton(onClick = onDismiss) { Text("Cancel", color = Accent) }
-                    TextButton(onClick = onConfirm) { Text("OK", color = Accent) }
+                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    TextButton(onClick = onConfirm) { Text("OK") }
                 }
             }
         }

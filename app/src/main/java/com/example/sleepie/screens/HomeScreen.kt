@@ -24,6 +24,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -156,12 +157,22 @@ fun HomeScreen(
 
             if (startTime > 0) {
                 Button(
-                    onClick = { /* Already sleeping */ },
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    onClick = {
+                        val finalStartTime = startTime // Capture current start time
+                        // Navigate to summary screen to log the session
+                        navController.navigate("summary/$finalStartTime")
+
+                        // Reset start time in SharedPreferences and local state
+                        prefs.edit { remove("start_time") }
+                        startTime = 0L
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
                     shape = RoundedCornerShape(18.dp),
-                    enabled = false
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer)
                 ) {
-                    Text("Sleeping...", fontWeight = FontWeight.SemiBold)
+                    Text("Stop Sleep", fontWeight = FontWeight.SemiBold)
                 }
             } else {
                 Button(
@@ -172,8 +183,10 @@ fun HomeScreen(
                         }
                         startTime = newStartTime
                     },
-                    enabled = hasAlarm, // ✅ FIX: Only enable if there's an alarm
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    enabled = hasAlarm,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
                     shape = RoundedCornerShape(18.dp)
                 ) {
                     Icon(Icons.Filled.Bedtime, contentDescription = null)
@@ -267,6 +280,8 @@ private fun AlarmDashboardCard(
             }
 
             val progress = (remainingTime.toFloat() / totalTime).coerceIn(0f, 1f)
+            val animatedProgress by animateFloatAsState(targetValue = progress, label = "Alarm Progress")
+
 
             Row(
                 modifier = Modifier
@@ -304,14 +319,22 @@ private fun AlarmDashboardCard(
                     val indicatorColor = MaterialTheme.colorScheme.primary
                     val trackColor = MaterialTheme.colorScheme.surfaceVariant
 
-                    CircularProgressIndicator(
-                        progress = progress,
-                        modifier = Modifier.fillMaxSize(),
-                        color = indicatorColor,
-                        trackColor = trackColor,
-                        strokeWidth = 10.dp,
-                        strokeCap = StrokeCap.Round
-                    )
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawArc(
+                            color = trackColor,
+                            startAngle = -90f,
+                            sweepAngle = 360f,
+                            useCenter = false,
+                            style = Stroke(width = 10.dp.toPx(), cap = StrokeCap.Round)
+                        )
+                        drawArc(
+                            color = indicatorColor,
+                            startAngle = -90f,
+                            sweepAngle = 360 * animatedProgress,
+                            useCenter = false,
+                            style = Stroke(width = 10.dp.toPx(), cap = StrokeCap.Round)
+                        )
+                    }
 
                     val hours = (remainingTime / (1000 * 60 * 60)) % 24
                     val minutes = (remainingTime / (1000 * 60)) % 60
@@ -363,7 +386,7 @@ private fun SleepStatsRow(lastSleep: SleepSession?, trend: String) {
     ) {
         StatCard("Duration", lastSleep?.duration ?: "--", Icons.Filled.Schedule)
         StatCard("Quality", lastSleep?.quality ?: "--", Icons.Filled.Star)
-
+        StatCard("Trend", trend, Icons.AutoMirrored.Filled.ShowChart)
     }
 }
 
@@ -380,17 +403,23 @@ private fun RowScope.StatCard(
         Column(
             modifier = Modifier.padding(18.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Icon(
                 icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
+                contentDescription = title,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(28.dp)
             )
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
